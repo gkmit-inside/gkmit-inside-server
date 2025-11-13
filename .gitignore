@@ -1,6 +1,9 @@
 # Node modules
 node_modules/
 
+# Git keep files
+**/.gitkeep
+
 # Environment variables
 .env
 .env.*
