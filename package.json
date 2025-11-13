@@ -1,5 +1,5 @@
 {
-  "name": "gkmit_inside_server",
+  "name": "gkmit-inside-server",
   "version": "1.0.0",
   "description": "",
   "homepage": "https://github.com/gkmit-inside/gkmit-inside-server#readme",
@@ -15,7 +15,8 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -23,6 +24,7 @@
     "express": "^5.1.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
+    "nodemon": "^3.1.11",
+    "prettier": "^3.6.2"
   }
 }
