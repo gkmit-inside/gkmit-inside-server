@@ -3,6 +3,11 @@ node_modules/
 
 # Environment variables
 .env
+.env.*
+!.env.example
+
+# Package lock files
+package-lock.json
 
 # Logs
 logs
