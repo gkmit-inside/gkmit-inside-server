@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { globalErrorHandler } from './middlewares/errorHandler.js';
 
 import { authRouter } from './routes/auth.routes.js';
 
@@ -27,6 +28,8 @@ app.get('/', (req, res) => {
 
 // api routes
 app.use('/api/auth', authRouter);
+
+app.use(globalErrorHandler);
 
 // Server start
 const PORT = process.env.PORT || 5000;
