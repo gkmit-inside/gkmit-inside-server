@@ -31,20 +31,18 @@ export const isAuth = async (req, res, next) => {
         .populate('role', 'name');
 
       if (!req.user) {
-        return res
-          .status(401)
-          .json({ message: 'Not authorized, user not found' });
+        return sendError(res, STATUS.UNAUTHORIZED, 'Not authorized, user not found');
       }
 
       next();
     } catch (error) {
       console.error(error);
-      return res.status(401).json({ message: 'Not authorized, token failed' });
+      return sendError(res, STATUS.UNAUTHORIZED, 'Not authorized, user not found');
     }
   }
 
   if (!token) {
-    return res.status(401).json({ message: 'Not authorized, no token' });
+    return sendError(res, STATUS.UNAUTHORIZED, 'Not authorized, token failed');
   }
 };
 
@@ -55,6 +53,6 @@ export const isAdmin = (req, res, next) => {
   if (req.user && req.user.role === ROLES.ADMIN) {
     next();
   } else {
-    res.status(403).json({ message: 'Not authorized as an admin' });
+    return sendError(res, STATUS.FORBIDDEN, 'Not authorized as an admin');
   }
 };
