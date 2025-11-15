@@ -2,6 +2,7 @@ import { User } from '../models/User.model.js';
 import { Role } from '../models/Role.model.js';
 import { STATUS } from '../constants/httpStatus.js';
 import { generateToken } from '../utils/generateToken.js';
+import { ROLES } from '../constants/roles.js';
 
 /**
  * @desc    Handles Admin or Employee login
@@ -16,13 +17,13 @@ export const loginUser = async (email, password) => {
     if (isAdminEmail && isAdminPassword) {
         const token = generateToken({
             email: process.env.ADMIN_EMAIL,
-            role: 'admin',
+            role: ROLES.ADMIN,
         });
         return {
             statusCode: STATUS.OK,
             data: {
                 token,
-                user: { email: process.env.ADMIN_EMAIL, role: 'admin' },
+                user: { email: process.env.ADMIN_EMAIL, role: ROLES.ADMIN },
             },
         };
     }
@@ -31,7 +32,7 @@ export const loginUser = async (email, password) => {
         .select('+passwordHash')
         .populate('role', 'name');
 
-    if (!user || user.role.name !== 'employee') {
+    if (!user || user.role.name !== ROLES.EMPLOYEE) {
         return {
             statusCode: STATUS.UNAUTHORIZED,
             message: 'Invalid credentials',
@@ -87,7 +88,7 @@ export const registerNewUser = async (name, email, password) => {
         };
     }
 
-    const employeeRole = await Role.findOne({ name: 'employee' });
+    const employeeRole = await Role.findOne({ name: ROLES.EMPLOYEE });
     if (!employeeRole) {
         return {
             statusCode: STATUS.INTERNAL_SERVER_ERROR,

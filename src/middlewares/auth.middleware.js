@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User.model.js';
+import { ROLES } from '../constants/roles.js';
 
 /**
  * @desc    Protects routes by verifying JWT
@@ -15,11 +16,11 @@ export const isAuth = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       if (
-        decoded.role === 'admin' &&
+        decoded.role === ROLES.ADMIN &&
         decoded.email === process.env.ADMIN_EMAIL
       ) {
         req.user = {
-          role: 'admin',
+          role: ROLES.ADMIN,
           email: process.env.ADMIN_EMAIL,
         };
         return next();
@@ -51,7 +52,7 @@ export const isAuth = async (req, res, next) => {
  * @desc    Protects routes for ADMINS ONLY
  */
 export const isAdmin = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
+  if (req.user && req.user.role === ROLES.ADMIN) {
     next();
   } else {
     res.status(403).json({ message: 'Not authorized as an admin' });
