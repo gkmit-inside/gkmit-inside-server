@@ -1,8 +1,9 @@
 import { User } from '../models/User.model.js';
 import { Role } from '../models/Role.model.js';
 import { STATUS } from '../constants/httpStatus.js';
-import { generateToken } from '../utils/generateToken.js';
+import { generateAccessToken, generateRefreshToken } from '../utils/token.js';
 import { ROLES } from '../constants/roles.js';
+import jwt from 'jsonwebtoken'
 
 /**
  * @desc    Handles Admin or Employee login
@@ -15,18 +16,24 @@ export const loginUser = async (email, password) => {
     const isAdminEmail = email === process.env.ADMIN_EMAIL;
     const isAdminPassword = password === process.env.ADMIN_PASSWORD;
     if (isAdminEmail && isAdminPassword) {
-        const token = generateToken({
+        const adminPayload = {
             email: process.env.ADMIN_EMAIL,
             role: ROLES.ADMIN,
-        });
+        };
+        
+        const accessToken = generateAccessToken(adminPayload);
+        const refreshToken = generateRefreshToken(adminPayload);
+
         return {
             statusCode: STATUS.OK,
             data: {
-                token,
+                accessToken,
                 user: { email: process.env.ADMIN_EMAIL, role: ROLES.ADMIN },
             },
+            refreshToken,
         };
     }
+    
     // employee
     const user = await User.findOne({ email })
         .select('+passwordHash')
@@ -54,10 +61,13 @@ export const loginUser = async (email, password) => {
         };
     }
 
-    const token = generateToken({
+    const userPayload = {
         id: user._id,
         role: user.role.name,
-    });
+    };
+
+    const accessToken = generateAccessToken(userPayload);
+    const refreshToken = generateRefreshToken(userPayload);
 
     const userData = {
         id: user._id,
@@ -68,7 +78,8 @@ export const loginUser = async (email, password) => {
 
     return {
         statusCode: STATUS.OK,
-        data: { token, user: userData },
+        data: { accessToken, user: userData },
+        refreshToken,
     };
 };
 
@@ -108,4 +119,50 @@ export const registerNewUser = async (name, email, password) => {
         statusCode: STATUS.CREATED,
         message: 'Registration successful. Waiting for admin approval.',
     };
+};
+
+
+/**
+ * @desc    Validates a refresh token and issues a new access token
+ * @param   {string} token - The incoming refresh token
+ * @returns {object} { statusCode, accessToken, message }
+ */
+export const refreshAccessToken = async (token) => {
+    try {
+        const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+
+        let newAccessToken;
+        // for admin
+        if (decoded.role === ROLES.ADMIN) {
+            newAccessToken = generateAccessToken({
+                email: decoded.email,
+                role: ROLES.ADMIN,
+            });
+        } else {
+            // user still exist
+            const user = await User.findById(decoded.id);
+            if (!user) {
+                return {
+                    statusCode: STATUS.UNAUTHORIZED,
+                    message: 'User not found',
+                };
+            }
+
+            newAccessToken = generateAccessToken({
+                id: user._id,
+                role: user.role.name,
+            });
+        }
+
+        return {
+            statusCode: STATUS.OK,
+            accessToken: newAccessToken,
+        };
+
+    } catch (error) {
+        return {
+            statusCode: STATUS.UNAUTHORIZED,
+            message: 'Invalid or expired refresh token',
+        };
+    }
 };

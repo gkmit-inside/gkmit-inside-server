@@ -14,7 +14,7 @@ export const isAuth = async (req, res, next) => {
   ) {
     try {
       token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
       if (
         decoded.role === ROLES.ADMIN &&
         decoded.email === process.env.ADMIN_EMAIL
@@ -37,7 +37,10 @@ export const isAuth = async (req, res, next) => {
       next();
     } catch (error) {
       console.error(error);
-      return sendError(res, STATUS.UNAUTHORIZED, 'Not authorized, user not found');
+      if (error.name === 'TokenExpiredError') {
+          return sendError(res, STATUS.UNAUTHORIZED, 'Token expired');
+      }
+      return sendError(res, STATUS.UNAUTHORIZED, 'Not authorized, token failed');
     }
   }
 
