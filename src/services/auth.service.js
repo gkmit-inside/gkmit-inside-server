@@ -83,7 +83,7 @@ export const registerNewUser = async (name, email, password) => {
     const userExists = await User.findOne({ email });
     if (userExists) {
         return {
-            statusCode: STATUS.BAD_REQUEST,
+            statusCode: STATUS.CONFLICT,
             message: 'User already exists',
         };
     }
