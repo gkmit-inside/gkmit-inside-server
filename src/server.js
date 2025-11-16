@@ -1,3 +1,4 @@
+import './config/env.js'
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -7,10 +8,7 @@ import { fileURLToPath } from 'url';
 import { globalErrorHandler } from './middlewares/errorHandler.js';
 
 import { authRouter } from './routes/auth.routes.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+import { postRouter } from './routes/post.routes.js';
 
 import { connectDB } from './config/db.js';
 
@@ -30,6 +28,8 @@ app.get('/', (req, res) => {
 
 // api routes
 app.use('/api/auth', authRouter);
+app.use('/api/posts', postRouter);
+
 
 app.use(globalErrorHandler);
 
