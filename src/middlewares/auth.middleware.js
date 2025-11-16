@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User.model.js';
 import { ROLES } from '../constants/roles.js';
+import { sendError } from '../utils/apiResponse.js';
+import { STATUS } from '../constants/httpStatus.js';
 
 /**
  * @desc    Protects routes by verifying JWT
@@ -14,7 +16,13 @@ export const isAuth = async (req, res, next) => {
   ) {
     try {
       token = req.headers.authorization.split(' ')[1];
+
+      if (!token) {
+        return sendError(res, STATUS.UNAUTHORIZED, 'Not authorized, malformed token');
+      }
+
       const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+      
       if (
         decoded.role === ROLES.ADMIN &&
         decoded.email === process.env.ADMIN_EMAIL
@@ -45,7 +53,7 @@ export const isAuth = async (req, res, next) => {
   }
 
   if (!token) {
-    return sendError(res, STATUS.UNAUTHORIZED, 'Not authorized, token failed');
+    return sendError(res, STATUS.UNAUTHORIZED, 'Not authorized, no token');
   }
 };
 

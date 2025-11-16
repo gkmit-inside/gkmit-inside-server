@@ -1,41 +1,43 @@
-import './config/env.js'
+import './config/env.js'; // MUST BE FIRST
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import path from 'path';
+// import dotenv from 'dotenv'; // <-- 1. DELETE THIS LINE
 import cookieParser from 'cookie-parser';
-import { fileURLToPath } from 'url';
-import { globalErrorHandler } from './middlewares/errorHandler.js';
-
-import { authRouter } from './routes/auth.routes.js';
-import { postRouter } from './routes/post.routes.js';
-
 import { connectDB } from './config/db.js';
 
-dotenv.config();
+// Import all routers
+import { authRouter } from './routes/auth.routes.js';
+import { postRouter } from './routes/post.routes.js';
+import { adminRouter } from './routes/admin.routes.js';
+
+// Import global error handler
+import { globalErrorHandler } from './middlewares/errorHandler.js';
+// dotenv.config(); // <-- 2. DELETE THIS LINE
 
 export const app = express();
 
-// Middleware
+// --- Core Middlewares ---
 app.use(cors());
-app.use(express.json());
 app.use(cookieParser());
+app.use(express.json()); // This middleware is required to read req.body
 
-// Basic route
+// --- Test Route ---
 app.get('/', (req, res) => {
-  res.send('Gkmit Server is running...');
+    res.send('GKMIT Server is running...');
 });
 
-// api routes
+// --- API Routes ---
 app.use('/api/auth', authRouter);
 app.use('/api/posts', postRouter);
+app.use('/api/admin', adminRouter);
 
-
+// --- Global Error Handler (Must be LAST) ---
 app.use(globalErrorHandler);
 
-// Server start
+// --- Server Start ---
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  connectDB();
-  console.log(`Server running on port http://localhost:${PORT}`);
+    connectDB();
+    console.log(`Server running on port http://localhost:${PORT}`);
 });
