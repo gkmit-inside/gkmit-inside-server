@@ -3,58 +3,94 @@ import * as PostService from '../services/post.service.js';
 import { sendSuccess, sendError } from '../utils/apiResponse.js';
 import { asyncHandler } from '../middlewares/errorHandler.js';
 
-/**
- * @desc    Create a new post
- * @route   POST /api/posts
- * @access  Protected
- */
 export const createPost = asyncHandler(async (req, res) => {
-// ... existing code ...
+    const { body, file } = req;
+    const userId = req.user.id; 
+    const result = await PostService.createPost(body, file, userId);
+    if (result.message) {
+        return sendError(res, result.statusCode, result.message);
+    }
+    return sendSuccess(res, result.statusCode, result.data);
 });
 
-/**
- * @desc    Get all posts created by the logged-in user
- * @route   GET /api/posts/me
- * @access  Protected
- */
 export const getMyPosts = asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const result = await PostService.getMyPosts(userId);
     return sendSuccess(res, result.statusCode, result.data);
 });
 
-/**
- * @desc    Update a user's own post
- * @route   PUT /api/posts/:id
- * @access  Protected (Owner Only)
- */
 export const updatePost = asyncHandler(async (req, res) => {
-    const postId = req.params.id;
+    const { id } = req.params;
     const userId = req.user.id;
-    const postData = req.body;
-
-    const result = await PostService.updatePost(postId, postData, userId);
-
+    const { body } = req;
+    const result = await PostService.updatePost(id, body, userId);
     if (result.message) {
         return sendError(res, result.statusCode, result.message);
     }
-    return sendSuccess(res, result.statusCode, result.data, 'Post updated successfully');
+    return sendSuccess(res, result.statusCode, result.data, "Post updated successfully");
 });
 
-
-/**
- * @desc    Delete a user's own post (soft delete)
- * @route   DELETE /api/posts/:id
- * @access  Protected (Owner Only)
- */
 export const deletePost = asyncHandler(async (req, res) => {
-    const postId = req.params.id;
+    const { id } = req.params;
     const userId = req.user.id;
-    
-    const result = await PostService.deletePost(postId, userId);
-
+    const result = await PostService.deletePost(id, userId);
     if (result.message) {
         return sendError(res, result.statusCode, result.message);
     }
     return sendSuccess(res, result.statusCode, null, result.message);
+});
+
+export const addComment = asyncHandler(async (req, res) => {
+    const postId = req.params.id;
+    const userId = req.user.id;
+    const { content } = req.body;
+    const result = await PostService.addComment(postId, content, userId);
+    if (result.statusCode >= STATUS.BAD_REQUEST) {
+        return sendError(res, result.statusCode, result.message);
+    }
+    return sendSuccess(res, result.statusCode, result.data, result.message);
+});
+
+export const toggleReaction = asyncHandler(async (req, res) => {
+    const postId = req.params.id;
+    const userId = req.user.id;
+    const result = await PostService.toggleReaction(postId, userId);
+    if (result.statusCode >= STATUS.BAD_REQUEST) {
+        return sendError(res, result.statusCode, result.message);
+    }
+    return sendSuccess(res, result.statusCode, null, result.message);
+});
+
+export const toggleBookmark = asyncHandler(async (req, res) => {
+    const postId = req.params.id;
+    const userId = req.user.id;
+    const result = await PostService.toggleBookmark(postId, userId);
+    if (result.statusCode >= STATUS.BAD_REQUEST) {
+        return sendError(res, result.statusCode, result.message);
+    }
+    return sendSuccess(res, result.statusCode, null, result.message);
+});
+
+
+export const getFeed = asyncHandler(async (req, res) => {
+    const currentUserId = req.user.id;
+    const result = await PostService.getFeed(currentUserId);
+    return sendSuccess(res, result.statusCode, result.data);
+});
+
+export const getPostById = asyncHandler(async (req, res) => {
+    const postId = req.params.id;
+    const currentUserId = req.user.id;
+    const result = await PostService.getPostById(postId, currentUserId);
+
+    if (result.message) {
+        return sendError(res, result.statusCode, result.message);
+    }
+    return sendSuccess(res, result.statusCode, result.data);
+});
+
+export const getBookmarkedPosts = asyncHandler(async (req, res) => {
+    const currentUserId = req.user.id;
+    const result = await PostService.getBookmarkedPosts(currentUserId);
+    return sendSuccess(res, result.statusCode, result.data);
 });

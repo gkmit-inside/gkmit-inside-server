@@ -1,11 +1,5 @@
 import express from 'express';
-import {
-    getPendingUsers,
-    approveUser,
-    getPendingPosts,
-    approvePost,
-    rejectPost,
-} from '../controllers/admin.controller.js';
+import {getPendingUsers, approveUser, getPendingPosts, approvePost, rejectPost,} from '../controllers/admin.controller.js';
 import { isAuth, isAdmin } from '../middlewares/auth.middleware.js';
 
 export const adminRouter = express.Router();
