@@ -3,97 +3,84 @@ import { Post } from '../models/Post.model.js';
 import { STATUS } from '../constants/httpStatus.js';
 
 /**
- * @desc    Get all users pending approval
- * @returns {object} { statusCode, data }
+ * @desc    Get users by status
+ * @replaces getPendingUsers
  */
-export const getPendingUsers = async () => {
-    const users = await User.find({ isApproved: false }).select('name email createdAt');
-    return {
-        statusCode: STATUS.OK,
-        data: users,
-    };
+export const getUsersByStatus = async (status) => {
+    const query = {};
+    if (status === 'pending') {
+        query.isApproved = false;
+    } else if (status === 'approved') {
+        query.isApproved = true; 
+    }
+    const users = await User.find(query).select('name email createdAt isApproved');
+    return { statusCode: STATUS.OK, data: users };
 };
 
 /**
- * @desc    Approve a user
- * @param   {string} userId - The ID of the user to approve
- * @returns {object} { statusCode, message }
+ * @desc    Update a user's status (approve/reject)
+ * @replaces approveUser
  */
-export const approveUser = async (userId) => {
+export const updateUserStatus = async (userId, status) => {
+    if (!['approved', 'rejected'].includes(status)) {
+        return { statusCode: STATUS.BAD_REQUEST, message: 'Invalid status provided.' };
+    }
+
     const user = await User.findById(userId);
     if (!user) {
-        return { statusCode: STATUS.NOT_FOUND, message: 'User not found' };
-    }
-    if (user.isApproved) {
-        return { statusCode: STATUS.BAD_REQUEST, message: 'User is already approved' };
+        return { statusCode: STATUS.NOT_FOUND, message: 'User not found.' };
     }
 
-    user.isApproved = true;
-    user.approvedAt = Date.now();
-    await user.save();
+    if (status === 'approved') {
+        if (user.isApproved) {
+            return { statusCode: STATUS.BAD_REQUEST, message: 'User is already approved.' };
+        }
+        user.isApproved = true;
+        user.approvedAt = Date.now();
+    } else if (status === 'rejected') {
+        user.isApproved = false; 
+    }
 
-    return {
-        statusCode: STATUS.OK,
-        message: 'User approved successfully',
-    };
+    const updatedUser = await user.save();
+    return { statusCode: STATUS.OK, data: updatedUser };
 };
 
 /**
- * @desc    Get all posts pending approval
- * @returns {object} { statusCode, data }
+ * @desc    Get posts by status
+ * @replaces getPendingPosts
  */
-export const getPendingPosts = async () => {
-    const posts = await Post.find({ postStatus: 'pending' })
-        .populate('userId', 'name email') 
-        .select('title description createdAt');
-    return {
-        statusCode: STATUS.OK,
-        data: posts,
-    };
+export const getPostsByStatus = async (status) => {
+    const query = { deletedAt: null };
+    if (status) {
+        query.postStatus = status; 
+    }
+    const posts = await Post.find(query)
+        .populate('userId', 'name email')
+        .select('title description createdAt postStatus');
+    return { statusCode: STATUS.OK, data: posts };
 };
 
 /**
- * @desc    Approve a post
- * @param   {string} postId - The ID of the post to approve
- * @returns {object} { statusCode, message }
+ * @desc    Update a post's status (approve/reject)
+ * @replaces approvePost and rejectPost
  */
-export const approvePost = async (postId) => {
+export const updatePostStatus = async (postId, status) => {
+    if (!['approved', 'rejected'].includes(status)) {
+        return { statusCode: STATUS.BAD_REQUEST, message: 'Invalid status provided.' };
+    }
+
     const post = await Post.findById(postId);
     if (!post) {
-        return { statusCode: STATUS.NOT_FOUND, message: 'Post not found' };
+        return { statusCode: STATUS.NOT_FOUND, message: 'Post not found.' };
     }
-    if (post.postStatus === 'approved') {
-        return { statusCode: STATUS.BAD_REQUEST, message: 'Post is already approved' };
-    }
-
-    post.postStatus = 'approved';
-    post.approvedAt = Date.now();
-    await post.save();
-
-    return {
-        statusCode: STATUS.OK,
-        message: 'Post approved successfully',
-    };
-};
-
-/**
- * @desc    Reject a post
- * @param   {string} postId - The ID of the post to reject
- * @returns {object} { statusCode, message }
- */
-export const rejectPost = async (postId) => {
-    const post = await Post.findById(postId);
-    if (!post) {
-        return { statusCode: STATUS.NOT_FOUND, message: 'Post not found' };
-    }
-    if (post.postStatus === 'rejected') {
-        return { statusCode: STATUS.BAD_REQUEST, message: 'Post is already rejected' };
+    if (post.postStatus === status) {
+        return { statusCode: STATUS.BAD_REQUEST, message: `Post is already ${status}.` };
     }
 
-    post.postStatus = 'rejected';
-    await post.save();
-    return {
-        statusCode: STATUS.OK,
-        message: 'Post rejected successfully',
-    };
+    post.postStatus = status;
+    if (status === 'approved') {
+        post.approvedAt = Date.now();
+    }
+    const updatedPost = await post.save();
+    return { statusCode: STATUS.OK, data: updatedPost };
 };
