@@ -25,4 +25,17 @@ const postSchema = new Schema(
     { timestamps: true }
 );
 
+postSchema.pre('remove', async function(next) {
+    const post = this;
+    
+    try {
+        await Reaction.deleteMany({ postId: post._id });
+        await Bookmark.deleteMany({ postId: post._id });
+        await Comment.deleteMany({ postId: post._id });
+        next();
+    } catch (error) {
+        next(error); 
+    }
+});
+
 export const Post = mongoose.model('Post', postSchema);
