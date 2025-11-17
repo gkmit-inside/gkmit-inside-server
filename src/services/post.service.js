@@ -1,9 +1,113 @@
-import { imagekit } from '../config/imagekit.js';
 import { Post } from '../models/Post.model.js';
 import { Comment } from '../models/Comment.model.js';
 import { Reaction } from '../models/Reaction.model.js';
 import { Bookmark } from '../models/Bookmark.model.js';
+import { imagekit } from '../config/imagekit.js';
 import { STATUS } from '../constants/httpStatus.js';
+// import { CustomError } from '../utils/CustomError.js'; // Will be added in Commit 6
+import mongoose from 'mongoose';
+
+
+// --- Re-used from your original `getFeed` ---
+export const getFeed = async (currentUserId) => {
+    // This pipeline is excellent. No changes needed.
+    // ... (Your full aggregation pipeline code) ...
+    const posts = await Post.aggregate([
+        {
+            $match: {
+                postStatus: 'approved',
+                deletedAt: null
+            }
+        },
+        {
+            $lookup: {
+                from: 'users', 
+                localField: 'userId',
+                foreignField: '_id',
+                as: 'author',
+                pipeline: [{ $project: { name: 1, email: 1, department: 1, _id: 0 } }]
+            }
+        },
+        { $unwind: '$author' },
+        {
+            $lookup: {
+                from: 'reactions',
+                localField: '_id',
+                foreignField: 'postId',
+                as: 'reactions',
+            }
+        },
+        {
+            $lookup: {
+                from: 'comments',
+                localField: '_id',
+                foreignField: 'postId',
+                as: 'comments',
+            }
+        },
+        {
+            $lookup: {
+                from: 'bookmarks',
+                let: { postId: '$_id', userId: new mongoose.Types.ObjectId(currentUserId) }, // Ensure type cast
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $and: [
+                                    { $eq: ['$postId', '$$postId'] },
+                                    { $eq: ['$userId', '$$userId'] }
+                                ]
+                            }
+                        }
+                    }
+                ],
+                as: 'isBookmarked',
+            }
+        },
+        {
+            $project: {
+                _id: 1, title: 1, subtitle: 1, description: 1, mediaUrl: 1, tags: 1,
+                author: 1, createdAt: 1,
+                reactionCount: { $size: '$reactions' },
+                commentCount: { $size: '$comments' },
+                isBookmarked: { $gt: [{ $size: '$isBookmarked' }, 0] }, 
+                isLiked: {
+                    $gt: [{
+                        $size: {
+                            $filter: {
+                                input: '$reactions',
+                                as: 'react',
+                                cond: { $eq: ['$$react.userId', new mongoose.Types.ObjectId(currentUserId)] } // Ensure type cast
+                            }
+                        }
+                    }, 0]
+                }
+            }
+        },
+        { $sort: { approvedAt: -1 } }
+    ]);
+
+    return { statusCode: STATUS.OK, data: posts };
+};
+
+/**
+ * @desc    Get posts by a specific user
+ * @replaces getMyPosts
+ */
+export const getPostsByUser = async (userId, currentUserId) => {
+    // This addresses the review: "user can only fetch their own posts"
+    // We add a check.
+    if (userId !== currentUserId) {
+        // You might allow viewing other profiles, but for now, we'll lock it down
+        // as the reviewer implied.
+        return { statusCode: STATUS.FORBIDDEN, message: 'Not authorized to view these posts' };
+    }
+    const posts = await Post.find({ userId: userId, deletedAt: null }).sort({ createdAt: -1 });
+    return { statusCode: STATUS.OK, data: posts };
+};
+
+
+// --- All your other services, with original error handling (for now) ---
 
 export const createPost = async (postData, file, userId) => {
     if (!file) {
@@ -22,16 +126,11 @@ export const createPost = async (postData, file, userId) => {
             mediaUrl: url,
             postStatus: 'pending',
         });
-        return { statusCode: STATUS.CREATED, data: newPost };
+        return { statusCode: STATUS.CREATED, data: newPost, message: "Post created successfully. Awaiting admin approval." };
     } catch (uploadError) {
         console.error('ImageKit upload error:', uploadError);
         return { statusCode: STATUS.INTERNAL_SERVER_ERROR, message: 'Error uploading image' };
     }
-};
-
-export const getMyPosts = async (userId) => {
-    const posts = await Post.find({ userId: userId, deletedAt: null }).sort({ createdAt: -1 });
-    return { statusCode: STATUS.OK, data: posts };
 };
 
 export const updatePost = async (postId, postData, userId) => {
@@ -68,8 +167,8 @@ export const deletePost = async (postId, userId) => {
 
 export const addComment = async (postId, content, userId) => {
     const post = await Post.findById(postId);
-    if (!post || post.deletedAt) {
-        return { statusCode: STATUS.NOT_FOUND, message: 'Post not found' };
+    if (!post || post.deletedAt || post.postStatus !== 'approved') {
+        return { statusCode: STATUS.NOT_FOUND, message: 'Post not found or not open for comments' };
     }
     const newComment = await Comment.create({ postId, userId, content });
     return { statusCode: STATUS.CREATED, data: newComment, message: 'Comment added successfully' };
@@ -77,7 +176,7 @@ export const addComment = async (postId, content, userId) => {
 
 export const toggleReaction = async (postId, userId) => {
     const post = await Post.findById(postId);
-    if (!post || post.deletedAt) {
+    if (!post || post.deletedAt || post.postStatus !== 'approved') {
         return { statusCode: STATUS.NOT_FOUND, message: 'Post not found' };
     }
     const existingReaction = await Reaction.findOne({ postId, userId });
@@ -92,7 +191,7 @@ export const toggleReaction = async (postId, userId) => {
 
 export const toggleBookmark = async (postId, userId) => {
     const post = await Post.findById(postId);
-    if (!post || post.deletedAt) {
+    if (!post || post.deletedAt || post.postStatus !== 'approved') {
         return { statusCode: STATUS.NOT_FOUND, message: 'Post not found' };
     }
     const existingBookmark = await Bookmark.findOne({ postId, userId });
@@ -105,106 +204,6 @@ export const toggleBookmark = async (postId, userId) => {
     }
 };
 
-/**
- * @desc    Get the main feed with aggregated metrics
- * @returns {object} { statusCode, data }
- */
-export const getFeed = async (currentUserId) => {
-    // Stage 1: Get all approved posts and join user data
-    const posts = await Post.aggregate([
-        {
-            $match: {
-                postStatus: 'approved',
-                deletedAt: null
-            }
-        },
-        {
-            $lookup: {
-                from: 'users', 
-                localField: 'userId',
-                foreignField: '_id',
-                as: 'author',
-                pipeline: [{ $project: { name: 1, email: 1, department: 1, _id: 0 } }]
-            }
-        },
-        // De-array the author (it will be an array of size 1)
-        { $unwind: '$author' },
-        // Join with Reactions (to get total like count)
-        {
-            $lookup: {
-                from: 'reactions',
-                localField: '_id',
-                foreignField: 'postId',
-                as: 'reactions',
-            }
-        },
-        // Join with Comments (to get total comment count)
-        {
-            $lookup: {
-                from: 'comments',
-                localField: '_id',
-                foreignField: 'postId',
-                as: 'comments',
-            }
-        },
-        // Join with Bookmarks (to check if CURRENT USER bookmarked it)
-        {
-            $lookup: {
-                from: 'bookmarks',
-                let: { postId: '$_id', userId: currentUserId },
-                // Use a pipeline to check if a bookmark exists for THIS post AND THIS user
-                pipeline: [
-                    {
-                        $match: {
-                            $expr: {
-                                $and: [
-                                    { $eq: ['$postId', '$$postId'] },
-                                    { $eq: ['$userId', '$$userId'] }
-                                ]
-                            }
-                        }
-                    }
-                ],
-                as: 'isBookmarked',
-            }
-        },
-        // Project the final structure
-        {
-            $project: {
-                _id: 1,
-                title: 1,
-                subtitle: 1,
-                description: 1,
-                mediaUrl: 1,
-                tags: 1,
-                author: 1,
-                createdAt: 1,
-                reactionCount: { $size: '$reactions' },
-                commentCount: { $size: '$comments' },
-                isBookmarked: { $gt: [{ $size: '$isBookmarked' }, 0] }, 
-                isLiked: {
-                    $gt: [{
-                        $size: {
-                            $filter: {
-                                input: '$reactions',
-                                as: 'react',
-                                cond: { $eq: ['$$react.userId', currentUserId] }
-                            }
-                        }
-                    }, 0]
-                }
-            }
-        },
-        { $sort: { approvedAt: -1 } }
-    ]);
-
-    return { statusCode: STATUS.OK, data: posts };
-};
-
-/**
- * @desc    Get a single post with all its comments
- * @returns {object} { statusCode, data }
- */
 export const getPostById = async (postId, currentUserId) => {
     const post = await Post.findById(postId)
         .where({ deletedAt: null, postStatus: 'approved' })
@@ -215,15 +214,16 @@ export const getPostById = async (postId, currentUserId) => {
         return { statusCode: STATUS.NOT_FOUND, message: 'Post not found' };
     }
     
+    // ... (rest of the function is fine)
     const reactionCount = await Reaction.countDocuments({ postId });
     const commentCount = await Comment.countDocuments({ postId });
     const isLiked = await Reaction.exists({ postId, userId: currentUserId });
     const isBookmarked = await Bookmark.exists({ postId, userId: currentUserId });
-
     const comments = await Comment.find({ postId })
         .where({ deletedAt: null })
         .populate('userId', 'name email')
-        .sort({ createdAt: 1 }) 
+        .sort({ createdAt: 1 });
+
     const augmentedPost = {
         ...post,
         author: post.userId, 
@@ -237,12 +237,8 @@ export const getPostById = async (postId, currentUserId) => {
     return { statusCode: STATUS.OK, data: augmentedPost };
 };
 
-/**
- * @desc    Get all posts bookmarked by the user
- * @returns {object} { statusCode, data }
- */
 export const getBookmarkedPosts = async (userId) => {
-    const bookmarks = await Bookmark.find({ userId }).select('postId -_id'); // Select only postId
+    const bookmarks = await Bookmark.find({ userId }).select('postId -_id');
     const postIds = bookmarks.map(b => b.postId);
     const posts = await Post.find({
         _id: { $in: postIds },

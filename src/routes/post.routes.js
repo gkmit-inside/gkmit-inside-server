@@ -1,23 +1,73 @@
 import express from 'express';
-import { createPost, getMyPosts, updatePost, deletePost, addComment, toggleReaction, toggleBookmark, getFeed, getPostById, getBookmarkedPosts} from '../controllers/post.controller.js';
+import {
+    createPost,
+    getPosts, 
+    updatePost,
+    deletePost,
+    addComment,
+    toggleReaction,
+    toggleBookmark,
+    getPostById,
+    getBookmarkedPosts
+} from '../controllers/post.controller.js';
 import { isAuth } from '../middlewares/auth.middleware.js';
-import { validatePost } from '../middlewares/validators/post.validator.js';
 import { upload, handleUploadError } from '../middlewares/upload.js';
 
 export const postRouter = express.Router();
+/**
+ * @route   POST /api/posts
+ * @desc    Create a new post
+ */
+postRouter.post('/', isAuth, upload.single('image'), handleUploadError, createPost);
 
-postRouter.post('/', isAuth, upload.single('image'), handleUploadError, validatePost, createPost);
+/**
+ * @route   GET /api/posts
+ * @desc    Get posts. Handles main feed and "my posts".
+ * @example GET /api/posts (Main Feed)
+ * @example GET /api/posts?userId=... (A specific user's posts)
+ */
+postRouter.get('/', isAuth, getPosts);
 
-postRouter.get('/me', isAuth, getMyPosts);
-postRouter.put('/:id', isAuth, updatePost);
-postRouter.delete('/:id', isAuth, deletePost);
+/**
+ * @route   GET /api/posts/bookmarks
+ * @desc    Get all posts bookmarked by the current user
+ * @access  Authenticated User
+ */
+postRouter.get('/bookmarks', isAuth, getBookmarkedPosts);
 
-postRouter.post('/:id/comment', isAuth, addComment);
-postRouter.post('/:id/react', isAuth, toggleReaction);
-postRouter.post('/:id/bookmark', isAuth, toggleBookmark);
 
-postRouter.get('/', isAuth, getFeed);
-
+/**
+ * @route   GET /api/posts/:id
+ * @desc    Get a single post by its ID
+ */
 postRouter.get('/:id', isAuth, getPostById);
 
-postRouter.get('/bookmarks/me', isAuth, getBookmarkedPosts);
+/**
+ * @route   PUT /api/posts/:id
+ * @desc    Update an owned, pending post
+ */
+postRouter.put('/:id', isAuth, updatePost);
+
+/**
+ * @route   DELETE /api/posts/:id
+ * @desc    Soft-delete an owned post
+ */
+postRouter.delete('/:id', isAuth, deletePost);
+
+/**
+ * @route   POST /api/posts/:id/comment
+ * @desc    Add a comment to a post
+ */
+postRouter.post('/:id/comment', isAuth, addComment);
+
+/**
+ * @route   POST /api/posts/:id/react
+ * @desc    Toggle a reaction (like) on a post
+ */
+postRouter.post('/:id/react', isAuth, toggleReaction);
+
+/**
+ * @route   POST /api/posts/:id/bookmark
+ * @desc    Toggle a bookmark on a post
+ */
+postRouter.post('/:id/bookmark', isAuth, toggleBookmark);
