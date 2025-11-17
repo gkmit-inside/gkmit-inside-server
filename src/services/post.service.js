@@ -4,68 +4,28 @@ import { Reaction } from '../models/Reaction.model.js';
 import { Bookmark } from '../models/Bookmark.model.js';
 import { imagekit } from '../config/imagekit.js';
 import { STATUS } from '../constants/httpStatus.js';
-// import { CustomError } from '../utils/CustomError.js'; // Will be added in Commit 6
+import { CustomError } from '../utils/CustomError.js';
 import mongoose from 'mongoose';
 
 
-// --- Re-used from your original `getFeed` ---
 export const getFeed = async (currentUserId) => {
-    // This pipeline is excellent. No changes needed.
-    // ... (Your full aggregation pipeline code) ...
-    const posts = await Post.aggregate([
-        {
-            $match: {
-                postStatus: 'approved',
-                deletedAt: null
-            }
-        },
-        {
-            $lookup: {
-                from: 'users', 
-                localField: 'userId',
-                foreignField: '_id',
-                as: 'author',
-                pipeline: [{ $project: { name: 1, email: 1, department: 1, _id: 0 } }]
-            }
-        },
-        { $unwind: '$author' },
-        {
-            $lookup: {
-                from: 'reactions',
-                localField: '_id',
-                foreignField: 'postId',
-                as: 'reactions',
-            }
-        },
-        {
-            $lookup: {
-                from: 'comments',
-                localField: '_id',
-                foreignField: 'postId',
-                as: 'comments',
-            }
-        },
-        {
-            $lookup: {
+    try {
+        const posts = await Post.aggregate([
+            // pipeline
+            { $match: { postStatus: 'approved', deletedAt: null }},
+            { $lookup: { from: 'users', localField: 'userId', foreignField: '_id', as: 'author', pipeline: [{ $project: { name: 1, email: 1, department: 1, _id: 0 } }] }},
+            { $unwind: '$author' },
+            { $lookup: { from: 'reactions', localField: '_id', foreignField: 'postId', as: 'reactions' }},
+            { $lookup: { from: 'comments', localField: '_id', foreignField: 'postId', as: 'comments' }},
+            { $lookup: {
                 from: 'bookmarks',
-                let: { postId: '$_id', userId: new mongoose.Types.ObjectId(currentUserId) }, // Ensure type cast
+                let: { postId: '$_id', userId: new mongoose.Types.ObjectId(currentUserId) },
                 pipeline: [
-                    {
-                        $match: {
-                            $expr: {
-                                $and: [
-                                    { $eq: ['$postId', '$$postId'] },
-                                    { $eq: ['$userId', '$$userId'] }
-                                ]
-                            }
-                        }
-                    }
+                    { $match: { $expr: { $and: [ { $eq: ['$postId', '$$postId'] }, { $eq: ['$userId', '$$userId'] } ] } } }
                 ],
                 as: 'isBookmarked',
-            }
-        },
-        {
-            $project: {
+            }},
+            { $project: {
                 _id: 1, title: 1, subtitle: 1, description: 1, mediaUrl: 1, tags: 1,
                 author: 1, createdAt: 1,
                 reactionCount: { $size: '$reactions' },
@@ -77,41 +37,35 @@ export const getFeed = async (currentUserId) => {
                             $filter: {
                                 input: '$reactions',
                                 as: 'react',
-                                cond: { $eq: ['$$react.userId', new mongoose.Types.ObjectId(currentUserId)] } // Ensure type cast
+                                cond: { $eq: ['$$react.userId', new mongoose.Types.ObjectId(currentUserId)] }
                             }
                         }
                     }, 0]
                 }
-            }
-        },
-        { $sort: { approvedAt: -1 } }
-    ]);
-
-    return { statusCode: STATUS.OK, data: posts };
-};
-
-/**
- * @desc    Get posts by a specific user
- * @replaces getMyPosts
- */
-export const getPostsByUser = async (userId, currentUserId) => {
-    // This addresses the review: "user can only fetch their own posts"
-    // We add a check.
-    if (userId !== currentUserId) {
-        // You might allow viewing other profiles, but for now, we'll lock it down
-        // as the reviewer implied.
-        return { statusCode: STATUS.FORBIDDEN, message: 'Not authorized to view these posts' };
+            }},
+            { $sort: { approvedAt: -1 } }
+        ]);
+        return posts; // Just return data
+    } catch (error) {
+        throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
     }
-    const posts = await Post.find({ userId: userId, deletedAt: null }).sort({ createdAt: -1 });
-    return { statusCode: STATUS.OK, data: posts };
 };
 
-
-// --- All your other services, with original error handling (for now) ---
+export const getPostsByUser = async (userId, currentUserId) => {
+    if (userId !== currentUserId) {
+        throw new CustomError('Not authorized to view these posts', STATUS.FORBIDDEN);
+    }
+    try {
+        const posts = await Post.find({ userId: userId, deletedAt: null }).sort({ createdAt: -1 });
+        return posts; // Just return data
+    } catch (error) {
+        throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
+    }
+};
 
 export const createPost = async (postData, file, userId) => {
     if (!file) {
-        return { statusCode: STATUS.BAD_REQUEST, message: 'Image file is required' };
+        throw new CustomError('Image file is required', STATUS.BAD_REQUEST);
     }
     try {
         const uploadResponse = await imagekit.upload({
@@ -119,6 +73,7 @@ export const createPost = async (postData, file, userId) => {
             fileName: `${userId}_${Date.now()}_${file.originalname}`,
             folder: 'posts',
         });
+        
         const { url } = uploadResponse;
         const newPost = await Post.create({
             ...postData,
@@ -126,60 +81,74 @@ export const createPost = async (postData, file, userId) => {
             mediaUrl: url,
             postStatus: 'pending',
         });
-        return { statusCode: STATUS.CREATED, data: newPost, message: "Post created successfully. Awaiting admin approval." };
+        // Return a full object here since controller needs it
+        return { 
+            statusCode: STATUS.CREATED, 
+            data: newPost, 
+            message: "Post created successfully. Awaiting admin approval." 
+        };
     } catch (uploadError) {
         console.error('ImageKit upload error:', uploadError);
-        return { statusCode: STATUS.INTERNAL_SERVER_ERROR, message: 'Error uploading image' };
+        throw new CustomError('Error uploading image', STATUS.INTERNAL_SERVER_ERROR);
     }
 };
 
 export const updatePost = async (postId, postData, userId) => {
     const post = await Post.findById(postId);
     if (!post || post.deletedAt) {
-        return { statusCode: STATUS.NOT_FOUND, message: 'Post not found' };
+        throw new CustomError('Post not found', STATUS.NOT_FOUND);
     }
     if (post.userId.toString() !== userId) {
-        return { statusCode: STATUS.FORBIDDEN, message: 'Not authorized to update this post' };
+        throw new CustomError('Not authorized to update this post', STATUS.FORBIDDEN);
     }
     if (post.postStatus !== 'pending') {
-         return { statusCode: STATUS.BAD_REQUEST, message: 'Only pending posts can be updated' };
+         throw new CustomError('Only pending posts can be updated', STATUS.BAD_REQUEST);
     }
+
     const updatedPost = await Post.findByIdAndUpdate(
         postId,
         postData,
         { new: true, runValidators: true }
     );
-    return { statusCode: STATUS.OK, data: updatedPost };
+    return updatedPost; // Just return data
 };
 
 export const deletePost = async (postId, userId) => {
     const post = await Post.findById(postId);
     if (!post || post.deletedAt) {
-        return { statusCode: STATUS.NOT_FOUND, message: 'Post not found' };
+        throw new CustomError('Post not found', STATUS.NOT_FOUND);
     }
     if (post.userId.toString() !== userId) {
-        return { statusCode: STATUS.FORBIDDEN, message: 'Not authorized to delete this post' };
+        throw new CustomError('Not authorized to delete this post', STATUS.FORBIDDEN);
     }
+    
     post.deletedAt = Date.now();
     await post.save();
-    return { statusCode: STATUS.OK, message: 'Post deleted successfully' };
+    return 'Post deleted successfully'; // Return message
 };
 
 export const addComment = async (postId, content, userId) => {
     const post = await Post.findById(postId);
     if (!post || post.deletedAt || post.postStatus !== 'approved') {
-        return { statusCode: STATUS.NOT_FOUND, message: 'Post not found or not open for comments' };
+        throw new CustomError('Post not found or not open for comments', STATUS.NOT_FOUND);
     }
+    
     const newComment = await Comment.create({ postId, userId, content });
-    return { statusCode: STATUS.CREATED, data: newComment, message: 'Comment added successfully' };
+    return { 
+        statusCode: STATUS.CREATED, 
+        data: newComment, 
+        message: 'Comment added successfully' 
+    };
 };
 
 export const toggleReaction = async (postId, userId) => {
     const post = await Post.findById(postId);
     if (!post || post.deletedAt || post.postStatus !== 'approved') {
-        return { statusCode: STATUS.NOT_FOUND, message: 'Post not found' };
+        throw new CustomError('Post not found', STATUS.NOT_FOUND);
     }
+
     const existingReaction = await Reaction.findOne({ postId, userId });
+    
     if (existingReaction) {
         await Reaction.deleteOne({ _id: existingReaction._id });
         return { statusCode: STATUS.OK, message: 'Reaction removed successfully' };
@@ -192,9 +161,11 @@ export const toggleReaction = async (postId, userId) => {
 export const toggleBookmark = async (postId, userId) => {
     const post = await Post.findById(postId);
     if (!post || post.deletedAt || post.postStatus !== 'approved') {
-        return { statusCode: STATUS.NOT_FOUND, message: 'Post not found' };
+        throw new CustomError('Post not found', STATUS.NOT_FOUND);
     }
+
     const existingBookmark = await Bookmark.findOne({ postId, userId });
+    
     if (existingBookmark) {
         await Bookmark.deleteOne({ _id: existingBookmark._id });
         return { statusCode: STATUS.OK, message: 'Bookmark removed successfully' };
@@ -211,10 +182,9 @@ export const getPostById = async (postId, currentUserId) => {
         .lean(); 
 
     if (!post) {
-        return { statusCode: STATUS.NOT_FOUND, message: 'Post not found' };
+        throw new CustomError('Post not found', STATUS.NOT_FOUND);
     }
     
-    // ... (rest of the function is fine)
     const reactionCount = await Reaction.countDocuments({ postId });
     const commentCount = await Comment.countDocuments({ postId });
     const isLiked = await Reaction.exists({ postId, userId: currentUserId });
@@ -234,19 +204,23 @@ export const getPostById = async (postId, currentUserId) => {
         comments,
     };
 
-    return { statusCode: STATUS.OK, data: augmentedPost };
+    return augmentedPost; // Just return data
 };
 
 export const getBookmarkedPosts = async (userId) => {
-    const bookmarks = await Bookmark.find({ userId }).select('postId -_id');
-    const postIds = bookmarks.map(b => b.postId);
-    const posts = await Post.find({
-        _id: { $in: postIds },
-        postStatus: 'approved',
-        deletedAt: null
-    })
-    .populate('userId', 'name department email')
-    .sort({ createdAt: -1 });
+    try {
+        const bookmarks = await Bookmark.find({ userId }).select('postId -_id');
+        const postIds = bookmarks.map(b => b.postId);
+        const posts = await Post.find({
+            _id: { $in: postIds },
+            postStatus: 'approved',
+            deletedAt: null
+        })
+        .populate('userId', 'name department email')
+        .sort({ createdAt: -1 });
 
-    return { statusCode: STATUS.OK, data: posts };
+        return posts; // Just return data
+    } catch (error) {
+        throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
+    }
 };
