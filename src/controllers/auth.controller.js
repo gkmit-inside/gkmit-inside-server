@@ -33,8 +33,8 @@ export const login = asyncHandler(async (req, res) => {
  * @access  Public
  */
 export const registerUser = asyncHandler(async (req, res) => {
-    const { name, email, password } = req.body;
-    const result = await AuthService.registerNewUser(name, email, password);
+    const { name, email, password, department } = req.body;
+    const result = await AuthService.registerNewUser(name, email, password, department);
     if (result.message) {
         if (result.statusCode === STATUS.CREATED) {
             return sendSuccess(res, result.statusCode, null, result.message);

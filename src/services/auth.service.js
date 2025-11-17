@@ -88,9 +88,10 @@ export const loginUser = async (email, password) => {
  * @param   {string} name
  * @param   {string} email
  * @param   {string} password
+ * @param   {string} department
  * @returns {object} { statusCode, data, message }
  */
-export const registerNewUser = async (name, email, password) => {
+export const registerNewUser = async (name, email, password, department) => {
     const userExists = await User.findOne({ email });
     if (userExists) {
         return {
@@ -111,6 +112,7 @@ export const registerNewUser = async (name, email, password) => {
         name,
         email,
         passwordHash: password,
+        department,
         role: employeeRole._id,
         isApproved: false,
     });

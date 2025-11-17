@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true },
     passwordHash: { type: String, required: true, select: false },
     isApproved: { type: Boolean, default: false },
+    department: { type: String, required: true },
     role: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Role',
