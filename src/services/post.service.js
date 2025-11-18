@@ -14,7 +14,7 @@ export const getFeed = async (currentUserId) => {
             // pipeline
             { $match: { postStatus: 'approved', deletedAt: null }},
             { $lookup: { from: 'users', localField: 'userId', foreignField: '_id', as: 'author', pipeline: [{ $project: { name: 1, email: 1, department: 1, _id: 0 } }] }},
-            { $unwind: '$author' },
+            { $unwind: { path: '$author', preserveNullAndEmptyArrays: true } },
             { $lookup: { from: 'reactions', localField: '_id', foreignField: 'postId', as: 'reactions' }},
             { $lookup: { from: 'comments', localField: '_id', foreignField: 'postId', as: 'comments' }},
             { $lookup: {
@@ -43,7 +43,7 @@ export const getFeed = async (currentUserId) => {
                     }, 0]
                 }
             }},
-            { $sort: { approvedAt: -1 } }
+            { $sort: { createdAt: -1 } }
         ]);
         return posts; // Just return data
     } catch (error) {
