@@ -12,7 +12,7 @@ export const getUsersByStatus = async (status) => {
             query.isApproved = true; 
         }
         
-        const users = await User.find(query).select('name email createdAt isApproved');
+        const users = await User.find(query).select('name email createdAt isApproved department').sort({createdAt: -1});
         return users; // Just return data
     } catch (error) {
         throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
@@ -52,7 +52,7 @@ export const getPostsByStatus = async (status) => {
         
         const posts = await Post.find(query)
             .populate('userId', 'name email')
-            .select('title description createdAt postStatus');
+            .select('title description createdAt postStatus image mediaUrl');
         return posts; // Just return data
     } catch (error) {
         throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
