@@ -57,7 +57,8 @@ export const getPostsByUser = async (userId, currentUserId) => {
         throw new CustomError('Not authorized to view these posts', STATUS.FORBIDDEN);
     }
     try {
-        const posts = await Post.find({ userId: userId, deletedAt: null }).sort({ createdAt: -1 });
+        const posts = await Post.find({ userId, deletedAt: null }).populate('userId', 'name email department').sort({ createdAt: -1 });
+
         return posts; // Just return data
     } catch (error) {
         throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
