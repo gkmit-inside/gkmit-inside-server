@@ -57,10 +57,43 @@ export const getPostsByUser = async (userId, currentUserId) => {
         throw new CustomError('Not authorized to view these posts', STATUS.FORBIDDEN);
     }
     try {
-        const posts = await Post.find({ userId, deletedAt: null }).populate('userId', 'name email department').sort({ createdAt: -1 });
+        // 1. Fetch initial posts and populate author details
+        const posts = await Post.find({ userId, deletedAt: null })
+            .populate('userId', 'name email department')
+            .sort({ createdAt: -1 })
+            .lean(); 
 
-        return posts; // Just return data
+        // 2. Loop through posts and fetch metrics for each one (N+1 query pattern)
+        // NOTE: This runs multiple database queries and is less efficient than aggregation,
+        // but it fulfills the request to avoid aggregation logic here.
+        const postsWithMetrics = await Promise.all(posts.map(async (post) => {
+            const postId = post._id;
+
+            // Fetch Reaction Count
+            const reactionCount = await Reaction.countDocuments({ postId });
+            
+            // Fetch Comment Count
+            const commentCount = await Comment.countDocuments({ postId });
+
+            // Restructure and attach metrics (consistent with feed structure)
+            return {
+                ...post,
+                author: post.userId, // Rename populated user for consistency
+                userId: undefined,
+                reactionCount, // <-- NEW: Number of likes
+                commentCount,  // <-- NEW: Number of comments
+            };
+        }));
+
+        return postsWithMetrics; 
+
     } catch (error) {
+        // 1. If it's a CustomError we threw (404, 403, 400), re-throw it to the controller
+        if (error instanceof CustomError) {
+            throw error;
+        }
+        
+        // 2. If it's an unknown database error, throw a generic 500 error
         throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
     }
 };
