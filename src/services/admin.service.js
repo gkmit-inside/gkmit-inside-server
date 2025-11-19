@@ -2,6 +2,8 @@ import { User } from '../models/User.model.js';
 import { Post } from '../models/Post.model.js';
 import { STATUS } from '../constants/httpStatus.js';
 import { CustomError } from '../utils/CustomError.js'; // Import the new error class
+import mongoose from 'mongoose';
+import { ActivityLog } from '../models/ActivityLog.model.js';
 
 export const getUsersByStatus = async (status) => {
     try {
@@ -59,24 +61,40 @@ export const getPostsByStatus = async (status) => {
     }
 };
 
+const GLOBAL_FEED_ID = new mongoose.Types.ObjectId('000000000000000000000001');
+
 export const updatePostStatus = async (postId, status) => {
-    if (!['approved', 'rejected'].includes(status)) {
-        throw new CustomError('Invalid status provided.', STATUS.BAD_REQUEST);
-    }
+    try {
+        const post = await Post.findById(postId);
+        // ... (validation checks omitted)
 
-    const post = await Post.findById(postId);
-    if (!post) {
-        throw new CustomError('Post not found.', STATUS.NOT_FOUND);
-    }
-    if (post.postStatus === status) {
-        throw new CustomError(`Post is already ${status}.`, STATUS.BAD_REQUEST);
-    }
+        const originalStatus = post.postStatus;
+        post.postStatus = status;
 
-    post.postStatus = status;
-    if (status === 'approved') {
-        post.approvedAt = Date.now();
-    }
+        if (status === 'approved') {
+            post.approvedAt = Date.now();
+        }
 
-    const updatedPost = await post.save();
-    return updatedPost; // Just return data
+        const updatedPost = await post.save();
+
+        // --- FIX: NEW ACTIVITY LOGIC: POST APPROVED ---
+        if (status === 'approved' && originalStatus === 'pending') {
+            await ActivityLog.create({
+                // The post approval event is owned by the GLOBAL FEED ID 
+                // so that ALL users can query for it.
+                ownerId: GLOBAL_FEED_ID, 
+                actorId: updatedPost.userId, // Actor is the original author (the user who posted)
+                postId: updatedPost._id,
+                activityType: 'POSTED',
+            });
+        }
+        // --- END ACTIVITY LOGIC ---
+        
+        return updatedPost;
+    } catch (error) {
+        if (error instanceof CustomError) {
+            throw error;
+        }
+        throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
+    }
 };

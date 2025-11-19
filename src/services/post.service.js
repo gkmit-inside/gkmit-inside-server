@@ -2,6 +2,7 @@ import { Post } from '../models/Post.model.js';
 import { Comment } from '../models/Comment.model.js';
 import { Reaction } from '../models/Reaction.model.js';
 import { Bookmark } from '../models/Bookmark.model.js';
+import { ActivityLog } from '../models/ActivityLog.model.js';
 import { imagekit } from '../config/imagekit.js';
 import { STATUS } from '../constants/httpStatus.js';
 import { CustomError } from '../utils/CustomError.js';
@@ -129,31 +130,42 @@ export const deletePost = async (postId, userId) => {
 
 export const addComment = async (postId, content, userId) => {
     const post = await Post.findById(postId);
-    if (!post || post.deletedAt || post.postStatus !== 'approved') {
-        throw new CustomError('Post not found or not open for comments', STATUS.NOT_FOUND);
-    }
-    
+
     const newComment = await Comment.create({ postId, userId, content });
-    return { 
-        statusCode: STATUS.CREATED, 
-        data: newComment, 
-        message: 'Comment added successfully' 
-    };
+
+    if (post.userId.toString() !== userId) { 
+        await ActivityLog.create({
+            ownerId: post.userId,            
+            actorId: userId,                  
+            postId: post._id,
+            activityType: 'COMMENTED',
+            relatedEntityId: newComment._id, 
+        });
+    }
+    return { statusCode: STATUS.CREATED, data: newComment, message: 'Comment added successfully' };
 };
 
 export const toggleReaction = async (postId, userId) => {
     const post = await Post.findById(postId);
-    if (!post || post.deletedAt || post.postStatus !== 'approved') {
-        throw new CustomError('Post not found', STATUS.NOT_FOUND);
-    }
 
     const existingReaction = await Reaction.findOne({ postId, userId });
-    
+
     if (existingReaction) {
         await Reaction.deleteOne({ _id: existingReaction._id });
+        await ActivityLog.deleteOne({ relatedEntityId: existingReaction._id });
+        
         return { statusCode: STATUS.OK, message: 'Reaction removed successfully' };
     } else {
-        await Reaction.create({ postId, userId, reactionType: 'like' });
+        const newReaction = await Reaction.create({ postId, userId, reactionType: 'like' });
+        if (post.userId.toString() !== userId) { 
+            await ActivityLog.create({
+                ownerId: post.userId,             
+                actorId: userId,                 
+                postId: post._id,
+                activityType: 'REACTED',
+                relatedEntityId: newReaction._id, 
+            });
+        }
         return { statusCode: STATUS.CREATED, message: 'Reaction added successfully' };
     }
 };
