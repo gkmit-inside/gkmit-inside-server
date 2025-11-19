@@ -2,7 +2,7 @@ import { param, validationResult } from 'express-validator';
 import { sendError } from '../../utils/apiResponse.js';
 import { STATUS } from '../../constants/httpStatus.js';
 
-const handleValidationErrors = (req, res, next) => {
+export const handleValidationErrors = (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         const errorMessages = errors.array().map(err => err.msg).join(', ');

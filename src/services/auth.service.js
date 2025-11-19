@@ -13,6 +13,7 @@ import jwt from 'jsonwebtoken'
  */
 export const loginUser = async (email, password) => {
     // admin
+    try{
     const isAdminEmail = email === process.env.ADMIN_EMAIL;
     const isAdminPassword = password === process.env.ADMIN_PASSWORD;
     if (isAdminEmail && isAdminPassword) {
@@ -81,6 +82,12 @@ export const loginUser = async (email, password) => {
         data: { accessToken, user: userData },
         refreshToken,
     };
+}catch(error){
+            if (error instanceof CustomError) {
+            throw error;
+        }
+        throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
+    }
 };
 
 /**
@@ -92,6 +99,7 @@ export const loginUser = async (email, password) => {
  * @returns {object} { statusCode, data, message }
  */
 export const registerNewUser = async (name, email, password, department) => {
+    try{
     const userExists = await User.findOne({ email });
     if (userExists) {
         return {
@@ -120,7 +128,12 @@ export const registerNewUser = async (name, email, password, department) => {
     return {
         statusCode: STATUS.CREATED,
         message: 'Registration successful. Waiting for admin approval.',
-    };
+    };}catch(error){
+            if (error instanceof CustomError) {
+            throw error;
+        }
+        throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
+    }
 };
 
 

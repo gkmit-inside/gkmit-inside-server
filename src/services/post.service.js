@@ -96,26 +96,34 @@ export const createPost = async (postData, file, userId) => {
 };
 
 export const updatePost = async (postId, postData, userId) => {
-    const post = await Post.findById(postId);
-    if (!post || post.deletedAt) {
-        throw new CustomError('Post not found', STATUS.NOT_FOUND);
-    }
-    if (post.userId.toString() !== userId) {
-        throw new CustomError('Not authorized to update this post', STATUS.FORBIDDEN);
-    }
-    if (post.postStatus !== 'pending') {
-         throw new CustomError('Only pending posts can be updated', STATUS.BAD_REQUEST);
-    }
+    try{
+        const post = await Post.findById(postId);
+        if (!post || post.deletedAt) {
+            throw new CustomError('Post not found', STATUS.NOT_FOUND);
+        }
+        if (post.userId.toString() !== userId) {
+            throw new CustomError('Not authorized to update this post', STATUS.FORBIDDEN);
+        }
+        if (post.postStatus !== 'pending') {
+            throw new CustomError('Only pending posts can be updated', STATUS.BAD_REQUEST);
+        }
 
-    const updatedPost = await Post.findByIdAndUpdate(
-        postId,
-        postData,
-        { new: true, runValidators: true }
-    );
-    return updatedPost; // Just return data
+        const updatedPost = await Post.findByIdAndUpdate(
+            postId,
+            postData,
+            { new: true, runValidators: true }
+        );
+        return updatedPost; // Just return data
+    }catch(error){
+            if (error instanceof CustomError) {
+            throw error;
+        }
+        throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
+    }
 };
 
 export const deletePost = async (postId, userId) => {
+    try{
     const post = await Post.findById(postId);
     if (!post || post.deletedAt) {
         throw new CustomError('Post not found', STATUS.NOT_FOUND);
@@ -127,9 +135,16 @@ export const deletePost = async (postId, userId) => {
     post.deletedAt = Date.now();
     await post.save();
     return 'Post deleted successfully'; // Return message
+    }catch(error){
+            if (error instanceof CustomError) {
+            throw error;
+        }
+        throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
+    }
 };
 
 export const addComment = async (postId, content, userId) => {
+    try{
     const post = await Post.findById(postId);
 
     const newComment = await Comment.create({ postId, userId, content });
@@ -144,9 +159,16 @@ export const addComment = async (postId, content, userId) => {
         });
     }
     return { statusCode: STATUS.CREATED, data: newComment, message: 'Comment added successfully' };
+}catch(error){
+            if (error instanceof CustomError) {
+            throw error;
+        }
+        throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
+    }
 };
 
 export const toggleReaction = async (postId, userId) => {
+    try{
     const post = await Post.findById(postId);
 
     const existingReaction = await Reaction.findOne({ postId, userId });
@@ -169,9 +191,16 @@ export const toggleReaction = async (postId, userId) => {
         }
         return { statusCode: STATUS.CREATED, message: 'Reaction added successfully' };
     }
+}catch(error){
+            if (error instanceof CustomError) {
+            throw error;
+        }
+        throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
+    }
 };
 
 export const toggleBookmark = async (postId, userId) => {
+    try{
     const post = await Post.findById(postId);
     if (!post || post.deletedAt || post.postStatus !== 'approved') {
         throw new CustomError('Post not found', STATUS.NOT_FOUND);
@@ -185,10 +214,16 @@ export const toggleBookmark = async (postId, userId) => {
     } else {
         await Bookmark.create({ postId, userId });
         return { statusCode: STATUS.CREATED, message: 'Bookmark added successfully' };
+    }}catch(error){
+            if (error instanceof CustomError) {
+            throw error;
+        }
+        throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
     }
 };
 
 export const getPostById = async (postId, currentUserId) => {
+    try{
     const post = await Post.findById(postId)
         .where({ deletedAt: null, postStatus: 'approved' })
         .populate('userId', 'name department email')
@@ -218,6 +253,12 @@ export const getPostById = async (postId, currentUserId) => {
     };
 
     return augmentedPost; // Just return data
+}catch(error){
+            if (error instanceof CustomError) {
+            throw error;
+        }
+        throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
+    }
 };
 
 export const getBookmarkedPosts = async (userId) => {

@@ -22,6 +22,7 @@ export const getUsersByStatus = async (status) => {
 };
 
 export const updateUserStatus = async (userId, status) => {
+    try{
     if (!['approved', 'rejected'].includes(status)) {
         throw new CustomError('Invalid status provided.', STATUS.BAD_REQUEST);
     }
@@ -42,7 +43,13 @@ export const updateUserStatus = async (userId, status) => {
     }
 
     const updatedUser = await user.save();
-    return updatedUser; // Just return data
+    return updatedUser;
+ }catch(error){
+            if (error instanceof CustomError) {
+            throw error;
+        }
+        throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
+    } // Just return data
 };
 
 export const getPostsByStatus = async (status) => {

@@ -1,16 +1,7 @@
 import { body, param, validationResult } from 'express-validator';
 import { sendError } from '../../utils/apiResponse.js';
 import { STATUS } from '../../constants/httpStatus.js';
-
-// Middleware to check validation results
-const handleValidationErrors = (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        const errorMessages = errors.array().map(err => err.msg).join(', ');
-        return sendError(res, STATUS.BAD_REQUEST, errorMessages);
-    }
-    next();
-};
+import { handleValidationErrors } from './common.validators.js';
 
 // Validator for the 'id' param specifically on post routes
 export const validatePostIdParam = [
