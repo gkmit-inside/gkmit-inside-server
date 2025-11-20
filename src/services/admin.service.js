@@ -13,7 +13,6 @@ export const getUsersByStatus = async (status) => {
         } else if (status === 'approved') {
             query.isApproved = true; 
         }
-        
         const users = await User.find(query).select('name email createdAt isApproved department').sort({createdAt: -1});
         return users; // Just return data
     } catch (error) {
