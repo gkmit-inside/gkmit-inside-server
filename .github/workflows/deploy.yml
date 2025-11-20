@@ -31,5 +31,5 @@ jobs:
           cd /home/ubuntu/gkmit-inside-server
           git pull origin chore/github-action-setup
           npm install --production
-          pm2 reload ecosystem.config.js || pm2 start ecosystem.config.js
+          pm2 reload src/server.js || src/server.js
           pm2 save
