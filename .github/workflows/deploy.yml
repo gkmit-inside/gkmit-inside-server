@@ -1,0 +1,67 @@
+name: CI/CD Deployment to EC2
+
+on:
+  push:
+    branches:
+      - feat/ci-cd-setup # FIX 1: Trigger ONLY on push to the 'feat/ci-cd-setup' branch
+  pull_request:
+    branches:
+      - feat/ci-cd-setup # Optional: Run CI/CD when merging PRs into this branch
+      
+jobs:
+  build_and_test:
+    name: Build and Deploy (Tests Skipped)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # --- Continuous Integration (CI) Phase ---
+      - name: Set up Node.js and Install Dependencies
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run npm install
+        run: npm install # Only install dependencies, do not run tests here.
+        
+      # --- Continuous Deployment (CD) Phase ---
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.AWS_EC2_HOST }}
+          username: ${{ secrets.AWS_EC2_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          script_stop: true
+          # The deployment script to run on the EC2 machine
+          script: |
+            # Set deployment path
+            DEPLOY_PATH=/home/${{ secrets.AWS_EC2_USER }}/gksocial-repo
+            
+            # 1. Stop and remove any existing container
+            echo "Stopping existing container..."
+            docker stop gksocial-app || true
+            docker rm gksocial-app || true
+            
+            # 2. Pull the latest code from GitHub
+            # FIX 2: Ensure the EC2 server pulls the correct feature branch
+            echo "Pulling latest code from feat/ci-cd-setup branch..."
+            cd $DEPLOY_PATH
+            git pull origin feat/ci-cd-setup 
+            
+            # 3. Rebuild the Docker Image on the EC2 host
+            echo "Rebuilding Docker image on EC2..."
+            docker build -t gksocial-backend:latest .
+
+            # 4. Start the new container
+            echo "Starting new container..."
+            docker run -d \
+              --name gksocial-app \
+              -p 80:8000 \
+              --restart always \
+              -e NODE_ENV=production \
+              -e MONGO_URI='${{ secrets.MONGO_URI }}' \
+              gksocial-backend:latest
+            
+            echo "Deployment finished. App is running on port 80, mapped to container port 8000."
