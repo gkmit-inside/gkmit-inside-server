@@ -29,7 +29,7 @@ app.use(express.json());
 
 // test route
 app.get('/', (req, res) => {
-    res.send('Gkmit Server is running...');
+    res.send('Gkmit Server is running');
 });
 
 // routes
