@@ -16,7 +16,7 @@ export const app = express();
 
 // middlewares
 const corsOptions = {
-  origin: ['*'], // Your frontend URL
+  origin: true, // Your frontend URL
   credentials: true,                // Allow cookies
   optionsSuccessStatus: 200         // For older browsers
 };
