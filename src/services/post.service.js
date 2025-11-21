@@ -74,7 +74,8 @@ export const getPostsByUser = async (userId, currentUserId) => {
             
             // Fetch Comment Count
             const commentCount = await Comment.countDocuments({ postId });
-
+            const isLiked = await Reaction.exists({ postId, userId });
+            const isBookmarked = await Bookmark.exists({postId, userId})
             // Restructure and attach metrics (consistent with feed structure)
             return {
                 ...post,
@@ -82,6 +83,8 @@ export const getPostsByUser = async (userId, currentUserId) => {
                 userId: undefined,
                 reactionCount, // <-- NEW: Number of likes
                 commentCount,  // <-- NEW: Number of comments
+                isLiked,
+                isBookmarked
             };
         }));
 
@@ -303,10 +306,27 @@ export const getBookmarkedPosts = async (userId) => {
             postStatus: 'approved',
             deletedAt: null
         })
-        .populate('userId', 'name department email')
-        .sort({ createdAt: -1 });
+        .populate('userId', 'name email department') // Populate author details
+        .sort({ createdAt: -1 })
+        .lean(); 
 
-        return posts; // Just return data
+            const postsWithMetrics = await Promise.all(posts.map(async (post) => {
+                const postId = post._id;
+                const reactionCount = await Reaction.countDocuments({ postId });
+                const commentCount = await Comment.countDocuments({ postId });
+                const isLiked = await Reaction.exists({ postId, userId });
+                return {
+                    ...post,
+                    author: post.userId,
+                    userId: undefined,   
+                    reactionCount,   
+                    commentCount,      
+                    isLiked: !!isLiked,
+                    isBookmarked: true,
+                };
+        }));
+
+        return postsWithMetrics;
     } catch (error) {
         throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
     }
