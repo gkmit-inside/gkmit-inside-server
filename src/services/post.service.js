@@ -132,7 +132,7 @@ export const createPost = async (postData, file, userId) => {
 };
 
 export const updatePost = async (postId, postData, userId) => {
-    try{
+    try {
         const post = await Post.findById(postId);
         if (!post || post.deletedAt) {
             throw new CustomError('Post not found', STATUS.NOT_FOUND);
@@ -140,8 +140,13 @@ export const updatePost = async (postId, postData, userId) => {
         if (post.userId.toString() !== userId) {
             throw new CustomError('Not authorized to update this post', STATUS.FORBIDDEN);
         }
-        if (post.postStatus !== 'pending') {
-            throw new CustomError('Only pending posts can be updated', STATUS.BAD_REQUEST);
+
+        if (post.postStatus !== 'pending' && post.postStatus !== 'rejected') {
+             throw new CustomError('Only posts pending or rejected by admin can be updated', STATUS.BAD_REQUEST);
+        }
+
+        if (post.postStatus === 'rejected') {
+            postData.postStatus = 'pending';
         }
 
         const updatedPost = await Post.findByIdAndUpdate(
@@ -149,9 +154,10 @@ export const updatePost = async (postId, postData, userId) => {
             postData,
             { new: true, runValidators: true }
         );
-        return updatedPost; // Just return data
-    }catch(error){
-            if (error instanceof CustomError) {
+        return updatedPost; 
+
+    } catch (error) {
+        if (error instanceof CustomError) {
             throw error;
         }
         throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
