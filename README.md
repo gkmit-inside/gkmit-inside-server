@@ -1,4 +1,4 @@
-# GKMIT INSIDE: Project Overview, Mission, and Tech Stack
+# GKMIT INSIDE: Project Overview, Mission, and Tech Stack 
 
 ## 1. Overview
 
