@@ -4,8 +4,6 @@ import { STATUS } from '../constants/httpStatus.js';
 import { User } from '../models/User.model.js';
 import mongoose from 'mongoose';
 
-// --- GLOBAL FEED CONSTANT ---
-// Must match the ID used in admin.service.js
 const GLOBAL_FEED_ID = new mongoose.Types.ObjectId('000000000000000000000001');
 
 /**

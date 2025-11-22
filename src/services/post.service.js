@@ -57,15 +57,11 @@ export const getPostsByUser = async (userId, currentUserId) => {
         throw new CustomError('Not authorized to view these posts', STATUS.FORBIDDEN);
     }
     try {
-        // 1. Fetch initial posts and populate author details
         const posts = await Post.find({ userId, deletedAt: null })
             .populate('userId', 'name email department')
             .sort({ createdAt: -1 })
             .lean(); 
 
-        // 2. Loop through posts and fetch metrics for each one (N+1 query pattern)
-        // NOTE: This runs multiple database queries and is less efficient than aggregation,
-        // but it fulfills the request to avoid aggregation logic here.
         const postsWithMetrics = await Promise.all(posts.map(async (post) => {
             const postId = post._id;
 
@@ -76,13 +72,12 @@ export const getPostsByUser = async (userId, currentUserId) => {
             const commentCount = await Comment.countDocuments({ postId });
             const isLiked = await Reaction.exists({ postId, userId });
             const isBookmarked = await Bookmark.exists({postId, userId})
-            // Restructure and attach metrics (consistent with feed structure)
             return {
                 ...post,
-                author: post.userId, // Rename populated user for consistency
+                author: post.userId,
                 userId: undefined,
-                reactionCount, // <-- NEW: Number of likes
-                commentCount,  // <-- NEW: Number of comments
+                reactionCount, 
+                commentCount, 
                 isLiked,
                 isBookmarked
             };
@@ -91,12 +86,9 @@ export const getPostsByUser = async (userId, currentUserId) => {
         return postsWithMetrics; 
 
     } catch (error) {
-        // 1. If it's a CustomError we threw (404, 403, 400), re-throw it to the controller
         if (error instanceof CustomError) {
             throw error;
         }
-        
-        // 2. If it's an unknown database error, throw a generic 500 error
         throw new CustomError(error.message, STATUS.INTERNAL_SERVER_ERROR);
     }
 };
@@ -119,7 +111,6 @@ export const createPost = async (postData, file, userId) => {
             mediaUrl: url,
             postStatus: 'pending',
         });
-        // Return a full object here since controller needs it
         return { 
             statusCode: STATUS.CREATED, 
             data: newPost, 

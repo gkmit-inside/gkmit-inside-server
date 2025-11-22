@@ -13,8 +13,9 @@ const userSchema = new mongoose.Schema(
       ref: 'Role',
       required: true,
     },
+    deletedAt: { type: Date, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 userSchema.pre('remove', async function(next) {

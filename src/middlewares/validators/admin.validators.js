@@ -4,7 +4,6 @@ import { STATUS } from '../../constants/httpStatus.js';
 import { handleValidationErrors } from './common.validators.js';
 
 
-// Validator for the 'id' param specifically on admin routes
 export const validateUserIdParam = [
     param('id').isMongoId().withMessage('Invalid User ID format'),
     handleValidationErrors

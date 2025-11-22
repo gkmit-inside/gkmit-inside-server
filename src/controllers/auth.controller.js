@@ -18,17 +18,17 @@ export const login = asyncHandler(async (req, res) => {
     const { refreshToken } = result;
 
     res.cookie('refreshToken', refreshToken, {
-        httpOnly: true, // Makes it inaccessible to JavaScript
-        secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (matches token)
-        sameSite: 'strict', // Helps prevent CSRF
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 7 * 24 * 60 * 60 * 1000, 
+        sameSite: 'strict', 
     });
 
     return sendSuccess(res, result.statusCode, { accessToken, user });
 });
 
 /**
- * @desc    Register a new employee (pending approval)
+ * @desc    Register a new employee 
  * @route   POST /api/auth/register
  * @access  Public
  */
