@@ -1,25 +1,26 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches:
-      - development
+    push:
+        branches:
+            - development
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
+    deploy:
+        runs-on: ubuntu-latest
 
-    steps:
-    - name: Deploy to EC2 via SSH
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_PRIVATE_KEY }}
-        script: |
+        steps:
+            - name: Deploy to EC2 via SSH
+              uses: appleboy/ssh-action@v1.0.0
+              with:
+                  host: ${{ secrets.EC2_HOST }}
+                  username: ${{ secrets.EC2_USER }}
+                  key: ${{ secrets.EC2_PRIVATE_KEY }}
+                  script: |
 
-          cd /home/ubuntu/gkmit-inside-server
-          git pull origin development
-          npm install 
-          pm2 reload src/server.js || src/server.js
-          pm2 save
+                      cd /home/ubuntu/gkmit-inside-server
+                      git pull origin development
+                      source ~/.bashrc
+                      npm install 
+                      pm2 reload src/server.js || src/server.js
+                      pm2 save
