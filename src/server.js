@@ -15,14 +15,14 @@ import { globalErrorHandler } from './middlewares/errorHandler.js';
 export const app = express();
 
 // middlewares
-const corsOptions = {
-  origin: true, 
-  credentials: true,            
-  optionsSuccessStatus: 200   
-};
-app.use(cors(corsOptions));
-
-app.use(cors(corsOptions));
+app.use(
+  cors({
+    origin: process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(',')
+      : ['http://localhost:5173'],
+    credentials: true,
+  })
+);
 
 app.use(cookieParser());
 app.use(express.json()); 
